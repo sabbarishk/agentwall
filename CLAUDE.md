@@ -47,21 +47,34 @@ _Updated: 2026-06-07_
 ### Built
 - `requirements.txt` — fastapi, uvicorn, pyyaml, docker, aiosqlite, pydantic
 - `agentwall/__init__.py` — package init
-- `agentwall/policy.py` — PolicyEngine: loads YAML, evaluates tool_name → allow/deny/require_approval
-- `agentwall/audit.py` — AuditLogger: async SQLite writer with SHA-256 hash chaining per entry
-- `agentwall/sandbox.py` — DockerSandbox: runs Python callables in isolated Docker containers (no network, memory/CPU limits)
-- `agentwall/runtime.py` — AgentWall: composes policy + audit + sandbox; wrap(tool_fn) returns a policy-enforced async function
-- `agentwall/api.py` — FastAPI app: POST /execute, GET /audit/logs, GET /health
-- `policies/default.yaml` — sample policy: allow read_file/call_api, require_approval send_email, deny execute_shell
-- `examples/basic_agent.py` — working example wrapping two tools, demonstrating allow and deny paths
+- `agentwall/policy.py` — PolicyEngine: loads YAML, `evaluate(tool_name)` → allow/deny/require_approval
+- `agentwall/audit.py` — **Production-grade** AuditLogger:
+  - 16-field schema: id, action_id, session_id, agent_id, user_id, tool_name, event_type, outcome, risk_level, detail, input_summary, output_summary, ip_address, timestamp, previous_hash, current_hash
+  - SHA-256 hash chaining: current_hash = SHA256(previous_hash + action_id + tool_name + event_type + outcome + timestamp)
+  - `verify_chain()` — reads all entries, recalculates every hash, returns is_valid + tampered_entries list
+  - `check_anomalies()` — detects excessive denials (>5 in 10 min per agent), critical risk actions, tool flood (>20 calls in 1 min)
+  - `export_logs(format)` — exports all logs as JSON or CSV
+  - `get_session_summary(session_id)` — returns all events grouped by action_id for a full session story
+- `agentwall/sandbox.py` — DockerSandbox: runs Python callables in isolated Docker containers (no network, 128MB RAM, 0.5 CPU)
+- `agentwall/runtime.py` — AgentWall: composes policy + audit + sandbox; `wrap(tool_fn)` returns a policy-enforced async function; passes session_id, agent_id, user_id, risk_level, input/output summaries to audit
+- `agentwall/api.py` — FastAPI app:
+  - `POST /execute` — run a tool through policy + audit
+  - `GET /audit/logs` — all audit entries
+  - `GET /audit/verify` — verify tamper-proof hash chain
+  - `GET /audit/anomalies` — detect security anomalies
+  - `GET /audit/export?format=json|csv` — export audit log
+  - `GET /audit/session/{session_id}` — full session story grouped by action
+  - `GET /health` — health check
+- `policies/default.yaml` — allow: read_file, call_api — require_approval: send_email — deny: execute_shell
+- `examples/basic_agent.py` — working example wrapping two tools (allow + deny paths)
 
 ### Working
 - Layer 1 skeleton complete
 - Policy evaluation from YAML rules
-- Tamper-proof audit log with SHA-256 hash chaining to SQLite
+- Production-grade tamper-proof audit log with SHA-256 hash chaining, chain verification, anomaly detection, export
 - Docker sandbox with network isolation and resource limits
-- AgentWall runtime wrapping any callable
-- FastAPI gateway with execute, audit, and health endpoints
+- AgentWall runtime wrapping any callable with full audit context
+- FastAPI gateway with 7 endpoints covering execute, audit, verify, anomaly, export, session, health
 
 ### Next
 - Layer 2: Compliance packs
