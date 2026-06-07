@@ -42,17 +42,29 @@ Layer 3: Framework adapters (LangChain, Anthropic, OpenAI)
 ---
 
 ## CURRENT STATUS
-_Updated: 2026-05-31_
+_Updated: 2026-06-07_
 
 ### Built
-- CLAUDE.md with project definition and permanent rules
+- `requirements.txt` — fastapi, uvicorn, pyyaml, docker, aiosqlite, pydantic
+- `agentwall/__init__.py` — package init
+- `agentwall/policy.py` — PolicyEngine: loads YAML, evaluates tool_name → allow/deny/require_approval
+- `agentwall/audit.py` — AuditLogger: async SQLite writer with SHA-256 hash chaining per entry
+- `agentwall/sandbox.py` — DockerSandbox: runs Python callables in isolated Docker containers (no network, memory/CPU limits)
+- `agentwall/runtime.py` — AgentWall: composes policy + audit + sandbox; wrap(tool_fn) returns a policy-enforced async function
+- `agentwall/api.py` — FastAPI app: POST /execute, GET /audit/logs, GET /health
+- `policies/default.yaml` — sample policy: allow read_file/call_api, require_approval send_email, deny execute_shell
+- `examples/basic_agent.py` — working example wrapping two tools, demonstrating allow and deny paths
 
 ### Working
-- Nothing yet — Layer 1 skeleton not started
+- Layer 1 skeleton complete
+- Policy evaluation from YAML rules
+- Tamper-proof audit log with SHA-256 hash chaining to SQLite
+- Docker sandbox with network isolation and resource limits
+- AgentWall runtime wrapping any callable
+- FastAPI gateway with execute, audit, and health endpoints
 
 ### Next
-- Layer 1: Core skeleton
-  - Policy engine (YAML-based rule evaluation)
-  - Audit logger (SHA-256 hash chaining, tamper-proof)
-  - Docker sandbox (isolated execution environment)
-  - FastAPI gateway (agent request interception)
+- Layer 2: Compliance packs
+  - HIPAA pack: PHI detection rules, minimum necessary access
+  - NIST pack: access control categories, incident logging
+  - SOC2 pack: availability and confidentiality rules

@@ -1,0 +1,7 @@
+default: deny
+
+rules:
+  read_file: allow
+  call_api: allow
+  send_email: require_approval
+  execute_shell: deny
